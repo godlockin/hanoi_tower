@@ -22,6 +22,11 @@ function init(): void {
     setTimeout(() => loadingScreen.remove(), 300)
   }
 
+  // Set up state change callback to re-render UI
+  game.setOnStateChange((state) => {
+    renderer.render(state)
+  })
+
   // Initial render
   renderer.render(game.getState())
   renderer.setUndoEnabled(false)
