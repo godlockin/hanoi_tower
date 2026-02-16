@@ -2,31 +2,35 @@ import type { GameState, Difficulty } from './types'
 import { t, formatTime } from './i18n'
 import { getRecord } from './storage'
 
-// Disk colors (from small to large)
+// Disk colors - unified warm gradient palette
 const DISK_COLORS = [
-  '#ef4444', // red
-  '#f97316', // orange
-  '#eab308', // yellow
-  '#22c55e', // green
-  '#06b6d4', // cyan
-  '#3b82f6', // blue
-  '#8b5cf6', // purple
-  '#ec4899', // pink
-  '#64748b', // slate
+  '#fbbf24', // amber-400
+  '#f59e0b', // amber-500
+  '#d97706', // amber-600
+  '#b45309', // amber-700
+  '#92400e', // amber-800
+  '#ea580c', // orange-600
+  '#c2410c', // orange-700
+  '#9a3412', // orange-800
+  '#7c2d12', // orange-900
 ]
 
 export class Renderer {
   private container: HTMLElement
   private gameBoard: HTMLElement | null = null
   private pegs: HTMLElement[] = []
-  private disks: HTMLElement[][] = [[], [], []]
   private statsEl: HTMLElement | null = null
   private bestRecordEl: HTMLElement | null = null
-  private hintPeg: number | null = null
   private liftedDiskEl: HTMLElement | null = null
+  private tutorialStep: number = 0
+  private showTutorial: boolean = true
+  private hasSeenTutorial: boolean = false
 
   constructor(container: HTMLElement) {
     this.container = container
+    // Check if user has seen tutorial before
+    this.hasSeenTutorial = localStorage.getItem('hanoi-tutorial-seen') === 'true'
+    this.showTutorial = !this.hasSeenTutorial
   }
 
   render(gameState: GameState): void {
@@ -37,45 +41,28 @@ export class Renderer {
     this.updateLiftedDisk(gameState)
     this.updateStats(gameState)
     this.updateBestRecord(gameState.difficulty)
+    this.updateTutorial(gameState)
   }
 
   private createBaseStructure(): void {
     this.container.innerHTML = ''
 
-    // Header
+    // Header with language switch
     const header = document.createElement('div')
     header.className = 'header'
     header.innerHTML = `
+      <div class="header-top">
+        <button class="lang-switch" title="Switch Language">${t('langSwitch')}</button>
+        <button class="help-btn" title="Game Rules">?</button>
+      </div>
       <h1>${t('title')}</h1>
-      <p class="subtitle">${t('subtitle')}</p>
     `
     this.container.appendChild(header)
 
-    // Controls
-    const controls = document.createElement('div')
-    controls.className = 'controls'
-    controls.innerHTML = `
-      <div class="difficulty-selector">
-        <label>${t('difficulty')}</label>
-        <div class="difficulty-buttons">
-          ${['easy', 'medium', 'hard', 'master'].map(d => `
-            <button data-difficulty="${d}" class="diff-btn">${t(d as Difficulty)}</button>
-          `).join('')}
-        </div>
-      </div>
-      <button class="lang-switch">${t('langSwitch')}</button>
-    `
-    this.container.appendChild(controls)
-
-    // Stats
+    // Stats bar (compact)
     this.statsEl = document.createElement('div')
-    this.statsEl.className = 'stats'
+    this.statsEl.className = 'stats-bar'
     this.container.appendChild(this.statsEl)
-
-    // Best record
-    this.bestRecordEl = document.createElement('div')
-    this.bestRecordEl.className = 'best-record'
-    this.container.appendChild(this.bestRecordEl)
 
     // Game board
     this.gameBoard = document.createElement('div')
@@ -103,52 +90,181 @@ export class Renderer {
 
       this.gameBoard.appendChild(peg)
       this.pegs.push(peg)
-      this.disks[i] = []
     }
+
+    // Difficulty selector (segmented control)
+    const diffSelector = document.createElement('div')
+    diffSelector.className = 'difficulty-bar'
+    diffSelector.innerHTML = `
+      ${['easy', 'medium', 'hard', 'master'].map(d => `
+        <button data-difficulty="${d}" class="diff-btn ${d === 'easy' ? 'active' : ''}">${t(d as Difficulty)}</button>
+      `).join('')}
+    `
+    this.container.appendChild(diffSelector)
+
+    // Best record
+    this.bestRecordEl = document.createElement('div')
+    this.bestRecordEl.className = 'best-record'
+    this.container.appendChild(this.bestRecordEl)
 
     // Bottom controls
     const bottomControls = document.createElement('div')
     bottomControls.className = 'bottom-controls'
     bottomControls.innerHTML = `
-      <button class="control-btn undo-btn" disabled>${t('undo')}</button>
-      <button class="control-btn hint-btn">${t('hint')}</button>
-      <button class="control-btn reset-btn">${t('reset')}</button>
+      <button class="control-btn undo-btn" disabled title="${t('undo')}">
+        <span class="icon">↩</span>
+        <span class="label">${t('undo')}</span>
+      </button>
+      <button class="control-btn hint-btn" title="${t('hint')}">
+        <span class="icon">💡</span>
+        <span class="label">${t('hint')}</span>
+      </button>
+      <button class="control-btn reset-btn" title="${t('reset')}">
+        <span class="icon">↻</span>
+        <span class="label">${t('reset')}</span>
+      </button>
     `
     this.container.appendChild(bottomControls)
 
+    // Tutorial overlay
+    if (this.showTutorial) {
+      this.createTutorialOverlay()
+    }
+
+    // Rules modal (hidden by default)
+    this.createRulesModal()
+
     // Victory modal (hidden by default)
+    this.createVictoryModal()
+  }
+
+  private createTutorialOverlay(): void {
+    const overlay = document.createElement('div')
+    overlay.className = 'tutorial-overlay'
+    overlay.innerHTML = `
+      <div class="tutorial-content">
+        <h2>${t('tutorialTitle')}</h2>
+        <div class="tutorial-steps">
+          <div class="tutorial-step ${this.tutorialStep === 0 ? 'active' : ''}" data-step="0">
+            <div class="step-number">1</div>
+            <div class="step-text">${t('tutorialStep1')}</div>
+          </div>
+          <div class="tutorial-step ${this.tutorialStep === 1 ? 'active' : ''}" data-step="1">
+            <div class="step-number">2</div>
+            <div class="step-text">${t('tutorialStep2')}</div>
+          </div>
+          <div class="tutorial-step ${this.tutorialStep === 2 ? 'active' : ''}" data-step="2">
+            <div class="step-number">3</div>
+            <div class="step-text">${t('tutorialStep3')}</div>
+          </div>
+          <div class="tutorial-step ${this.tutorialStep === 3 ? 'active' : ''}" data-step="3">
+            <div class="step-number">4</div>
+            <div class="step-text">${t('tutorialStep4')}</div>
+          </div>
+        </div>
+        <div class="tutorial-actions">
+          <button class="tutorial-btn secondary tutorial-skip">${t('tutorialSkip')}</button>
+          <button class="tutorial-btn primary tutorial-next">${t('tutorialStart')}</button>
+        </div>
+      </div>
+    `
+    this.container.appendChild(overlay)
+  }
+
+  private createRulesModal(): void {
+    const modal = document.createElement('div')
+    modal.className = 'rules-modal hidden'
+    modal.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-content rules-content">
+        <h2>${t('rulesTitle')}</h2>
+        <ul class="rules-list">
+          ${(t('rulesContent') as string[]).map((rule: string) => `<li>${rule}</li>`).join('')}
+        </ul>
+        <button class="modal-close">${t('close')}</button>
+      </div>
+    `
+    this.container.appendChild(modal)
+  }
+
+  private createVictoryModal(): void {
     const modal = document.createElement('div')
     modal.className = 'victory-modal hidden'
     modal.innerHTML = `
-      <div class="modal-content">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content victory-content">
+        <div class="victory-icon">🏆</div>
         <h2>${t('victoryTitle')}</h2>
-        <div class="fireworks"></div>
         <p class="victory-message"></p>
         <div class="new-record-badge hidden">${t('newRecord')}</div>
+        <div class="fireworks"></div>
         <button class="play-again-btn">${t('playAgain')}</button>
       </div>
     `
     this.container.appendChild(modal)
   }
 
+  private updateTutorial(_gameState: GameState): void {
+    if (!this.showTutorial) return
+
+    const steps = this.container.querySelectorAll('.tutorial-step')
+    steps.forEach((step, index) => {
+      step.classList.toggle('active', index === this.tutorialStep)
+    })
+
+    const nextBtn = this.container.querySelector('.tutorial-next') as HTMLButtonElement
+    if (nextBtn) {
+      nextBtn.textContent = this.tutorialStep === 3 ? t('tutorialStart') as string : '下一步'
+    }
+  }
+
+  setTutorialStep(step: number): void {
+    this.tutorialStep = step
+    if (step > 3) {
+      this.closeTutorial()
+    } else {
+      this.updateTutorial(this.getCurrentState())
+    }
+  }
+
+  closeTutorial(): void {
+    this.showTutorial = false
+    this.hasSeenTutorial = true
+    localStorage.setItem('hanoi-tutorial-seen', 'true')
+    const overlay = this.container.querySelector('.tutorial-overlay')
+    overlay?.classList.add('hidden')
+  }
+
+  showRules(): void {
+    const modal = this.container.querySelector('.rules-modal')
+    modal?.classList.remove('hidden')
+  }
+
+  hideRules(): void {
+    const modal = this.container.querySelector('.rules-modal')
+    modal?.classList.add('hidden')
+  }
+
   private updatePegs(state: GameState): void {
-    const { pegs, liftedDisk, diskCount } = state
+    const { pegs, liftedDisk, diskCount, validTargets } = state
 
     this.pegs.forEach((pegEl, pegIndex) => {
-      // Update hint state
-      pegEl.classList.toggle('hint', this.hintPeg === pegIndex)
+      // Update visual states
+      pegEl.classList.toggle('lifting-from', liftedDisk?.pegIndex === pegIndex)
+      pegEl.classList.toggle('valid-target', validTargets.includes(pegIndex) && liftedDisk?.pegIndex !== pegIndex)
+      pegEl.classList.toggle('invalid-target', liftedDisk !== null && !validTargets.includes(pegIndex))
 
       const diskStack = pegEl.querySelector('.disk-stack') as HTMLElement
       diskStack.innerHTML = ''
 
-      // Calculate scale factor based on disk count
-      const maxDiskWidth = Math.min(80, 280 / diskCount)
-      const minDiskWidth = Math.max(20, maxDiskWidth * 0.4)
+      // Calculate dimensions
+      const maxDiskWidth = Math.min(100, 320 / diskCount)
+      const minDiskWidth = Math.max(30, maxDiskWidth * 0.5)
       const widthStep = (maxDiskWidth - minDiskWidth) / (diskCount - 1 || 1)
-      const diskHeight = Math.max(16, 120 / diskCount)
+      const diskHeight = Math.max(20, 160 / diskCount)
 
       pegs[pegIndex].forEach((diskSize, diskIndex) => {
-        // Skip the lifted disk - it will be rendered separately
+        // Skip the lifted disk
         if (liftedDisk && liftedDisk.pegIndex === pegIndex && diskIndex === pegs[pegIndex].length - 1) {
           return
         }
@@ -180,7 +296,7 @@ export class Renderer {
     disk.style.backgroundColor = DISK_COLORS[(diskSize - 1) % DISK_COLORS.length]
     disk.style.width = `${minDiskWidth + (diskSize - 1) * widthStep}px`
     disk.style.height = `${diskHeight}px`
-    disk.style.bottom = `${diskIndex * (diskHeight + 2)}px`
+    disk.style.bottom = `${diskIndex * (diskHeight + 4)}px`
     disk.style.zIndex = String(diskSize)
 
     return disk
@@ -199,11 +315,11 @@ export class Renderer {
     const pegEl = this.pegs[pegIndex]
     if (!pegEl) return
 
-    // Calculate dimensions same as regular disks
-    const maxDiskWidth = Math.min(80, 280 / state.diskCount)
-    const minDiskWidth = Math.max(20, maxDiskWidth * 0.4)
+    // Calculate dimensions
+    const maxDiskWidth = Math.min(100, 320 / state.diskCount)
+    const minDiskWidth = Math.max(30, maxDiskWidth * 0.5)
     const widthStep = (maxDiskWidth - minDiskWidth) / (state.diskCount - 1 || 1)
-    const diskHeight = Math.max(16, 120 / state.diskCount)
+    const diskHeight = Math.max(20, 160 / state.diskCount)
 
     // Create lifted disk element
     const liftedDisk = document.createElement('div')
@@ -214,33 +330,28 @@ export class Renderer {
     liftedDisk.style.height = `${diskHeight}px`
     liftedDisk.style.zIndex = '100'
 
-    // Position it above the peg
+    // Position it floating above
     const diskStack = pegEl.querySelector('.disk-stack') as HTMLElement
-    const stackHeight = state.pegs[pegIndex].length * (diskHeight + 2)
-    liftedDisk.style.bottom = `${stackHeight + 20}px`
+    const stackHeight = state.pegs[pegIndex].length * (diskHeight + 4)
+    liftedDisk.style.bottom = `${stackHeight + 30}px`
 
     diskStack.appendChild(liftedDisk)
     this.liftedDiskEl = liftedDisk
-
-    // Highlight the source peg
-    pegEl.classList.add('lifting-from')
   }
 
   private updateStats(state: GameState): void {
     if (!this.statsEl) return
 
     this.statsEl.innerHTML = `
-      <div class="stat-item">
-        <span class="stat-label">${t('time')}</span>
-        <span class="stat-value time-value">${formatTime(state.elapsedTime)}</span>
+      <div class="stat-box">
+        <span class="stat-icon">⏱️</span>
+        <span class="stat-value time">${formatTime(state.elapsedTime)}</span>
       </div>
-      <div class="stat-item">
-        <span class="stat-label">${t('moves')}</span>
-        <span class="stat-value moves-value">${state.moveCount}</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-label">${t('optimalMoves')}</span>
-        <span class="stat-value optimal-value">${Math.pow(2, state.diskCount) - 1}</span>
+      <div class="stat-box">
+        <span class="stat-icon">🔄</span>
+        <span class="stat-value moves">${state.moveCount}</span>
+        <span class="stat-separator">/</span>
+        <span class="stat-value optimal">${Math.pow(2, state.diskCount) - 1}</span>
       </div>
     `
   }
@@ -251,33 +362,28 @@ export class Renderer {
     const record = getRecord(difficulty)
 
     this.bestRecordEl.innerHTML = `
-      <div class="record-item">
+      <div class="record-box">
         <span class="record-label">${t('bestTime')}</span>
         <span class="record-value">${record.bestTime !== null ? formatTime(record.bestTime) : '-'}</span>
       </div>
-      <div class="record-item">
+      <div class="record-box">
         <span class="record-label">${t('bestMoves')}</span>
-        <span class="record-value">${record.bestMoves !== null ? record.bestMoves + t('movesSuffix') : '-'}</span>
+        <span class="record-value">${record.bestMoves !== null ? record.bestMoves : '-'}</span>
       </div>
     `
   }
 
   showHint(from: number, to: number): void {
-    // Highlight target peg
-    this.hintPeg = to
-    this.render({
-      ...this.getCurrentStateFromDOM(),
-      liftedDisk: { pegIndex: from, diskSize: 1 }
-    } as GameState)
+    const fromPeg = this.pegs[from]
+    const toPeg = this.pegs[to]
 
-    // Clear hint after 1.5 seconds
+    fromPeg?.classList.add('hint-source')
+    toPeg?.classList.add('hint-target')
+
     setTimeout(() => {
-      this.hintPeg = null
-      this.render({
-        ...this.getCurrentStateFromDOM(),
-        liftedDisk: null
-      } as GameState)
-    }, 1500)
+      fromPeg?.classList.remove('hint-source')
+      toPeg?.classList.remove('hint-target')
+    }, 2000)
   }
 
   showVictory(gameState: GameState, isNewRecord: boolean): void {
@@ -288,18 +394,17 @@ export class Renderer {
     if (message) {
       const difficultyLabel = t(gameState.difficulty)
       const timeStr = formatTime(gameState.elapsedTime)
-      const movesStr = String(gameState.moveCount) + t('movesSuffix')
+      const movesStr = String(gameState.moveCount)
 
-      message.innerHTML = t('victoryMessage')
-        .replace('{difficulty}', difficultyLabel)
-        .replace('{moves}', movesStr)
-        .replace('{time}', timeStr)
+      message.innerHTML = (t('victoryMessage') as string)
+        .replace('{difficulty}', `<strong>${difficultyLabel}</strong>`)
+        .replace('{moves}', `<strong>${movesStr}</strong>`)
+        .replace('{time}', `<strong>${timeStr}</strong>`)
     }
 
     badge?.classList.toggle('hidden', !isNewRecord)
     modal?.classList.remove('hidden')
 
-    // Trigger fireworks
     this.triggerFireworks()
   }
 
@@ -309,23 +414,22 @@ export class Renderer {
   }
 
   private triggerFireworks(): void {
-    const fireworks = this.container.querySelector('.fireworks')
+    const fireworks = this.container.querySelector('.victory-modal .fireworks')
     if (!fireworks) return
 
     fireworks.innerHTML = ''
 
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 30; i++) {
       setTimeout(() => {
         const firework = document.createElement('div')
         firework.className = 'firework'
-        firework.style.left = `${Math.random() * 100}%`
-        firework.style.top = `${Math.random() * 100}%`
+        firework.style.left = `${20 + Math.random() * 60}%`
+        firework.style.top = `${20 + Math.random() * 60}%`
         firework.style.backgroundColor = DISK_COLORS[Math.floor(Math.random() * DISK_COLORS.length)]
-        firework.style.animationDelay = `${Math.random() * 0.5}s`
         fireworks.appendChild(firework)
 
-        setTimeout(() => firework.remove(), 1000)
-      }, i * 100)
+        setTimeout(() => firework.remove(), 1500)
+      }, i * 80)
     }
   }
 
@@ -334,8 +438,7 @@ export class Renderer {
     if (undoBtn) undoBtn.disabled = !enabled
   }
 
-  private getCurrentStateFromDOM(): Partial<GameState> {
-    // Helper to reconstruct state from DOM for hint rendering
+  private getCurrentState(): GameState {
     return {
       pegs: [[], [], []],
       difficulty: 'easy',
@@ -344,7 +447,8 @@ export class Renderer {
       elapsedTime: 0,
       isPlaying: false,
       isCompleted: false,
-      liftedDisk: null
+      liftedDisk: null,
+      validTargets: []
     }
   }
 }

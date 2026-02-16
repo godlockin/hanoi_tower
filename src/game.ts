@@ -35,7 +35,8 @@ export class HanoiGame {
       elapsedTime: 0,
       isPlaying: false,
       isCompleted: false,
-      liftedDisk: null
+      liftedDisk: null,
+      validTargets: []
     }
   }
 
@@ -49,6 +50,29 @@ export class HanoiGame {
     this.solveHanoi(n - 1, from, aux, to)
     this.optimalSolution.push({ from, to })
     this.solveHanoi(n - 1, aux, to, from)
+  }
+
+  private calculateValidTargets(): number[] {
+    if (!this.state.liftedDisk) return []
+
+    const { pegIndex: fromPeg, diskSize } = this.state.liftedDisk
+    const validTargets: number[] = []
+
+    for (let i = 0; i < 3; i++) {
+      if (i === fromPeg) {
+        // Same peg is always a valid target (to cancel)
+        validTargets.push(i)
+        continue
+      }
+
+      const topDisk = this.state.pegs[i][this.state.pegs[i].length - 1]
+      // Can place on empty peg or on larger disk
+      if (topDisk === undefined || diskSize < topDisk) {
+        validTargets.push(i)
+      }
+    }
+
+    return validTargets
   }
 
   setOnStateChange(callback: (state: GameState) => void): void {
@@ -74,6 +98,7 @@ export class HanoiGame {
     const diskSize = pegs[pegIndex][pegs[pegIndex].length - 1]
 
     this.state.liftedDisk = { pegIndex, diskSize }
+    this.state.validTargets = this.calculateValidTargets()
     this.notifyStateChange()
     return true
   }
@@ -89,6 +114,7 @@ export class HanoiGame {
     // If clicking the same peg, cancel the lift
     if (fromPeg === targetPegIndex) {
       this.state.liftedDisk = null
+      this.state.validTargets = []
       this.notifyStateChange()
       return 'cancelled'
     }
@@ -104,6 +130,7 @@ export class HanoiGame {
       this.moveHistory.push({ from: fromPeg, to: targetPegIndex })
       this.state.moveCount++
       this.state.liftedDisk = null
+      this.state.validTargets = []
 
       // Start timer on first move
       if (!this.state.isPlaying && this.state.moveCount === 1) {
@@ -124,6 +151,7 @@ export class HanoiGame {
 
     // Invalid move - target peg has smaller disk, just cancel the lift
     this.state.liftedDisk = null
+    this.state.validTargets = []
     this.notifyStateChange()
     return 'invalid'
   }
@@ -137,6 +165,7 @@ export class HanoiGame {
     this.state.pegs[from].push(disk)
     this.state.moveCount--
     this.state.liftedDisk = null
+    this.state.validTargets = []
 
     // If undoing the last move, stop the game
     if (this.state.moveCount === 0) {

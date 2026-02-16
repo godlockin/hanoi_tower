@@ -24,7 +24,22 @@ const translations: Record<'zh' | 'en', I18n> = {
     playAgain: '再玩一次',
     movesSuffix: '步',
     secondsSuffix: '秒',
-    cancel: '取消选择'
+    cancel: '取消选择',
+    tutorialTitle: '新手指引',
+    tutorialStep1: '点击最上面的盘子，将其提起',
+    tutorialStep2: '可放置的柱子会高亮显示',
+    tutorialStep3: '点击高亮的柱子，放下盘子',
+    tutorialStep4: '目标：把所有盘子移到最右边的柱子',
+    tutorialStart: '开始游戏',
+    tutorialSkip: '跳过',
+    rulesTitle: '游戏规则',
+    rulesContent: [
+      '每次只能移动一个盘子',
+      '只能移动最上面的盘子',
+      '大盘子不能放在小盘子上面',
+      '目标：把所有盘子移到最右边的柱子'
+    ],
+    close: '关闭'
   },
   en: {
     title: 'Hanoi Tower',
@@ -49,7 +64,22 @@ const translations: Record<'zh' | 'en', I18n> = {
     playAgain: 'Play Again',
     movesSuffix: ' moves',
     secondsSuffix: 's',
-    cancel: 'Cancel'
+    cancel: 'Cancel',
+    tutorialTitle: 'Tutorial',
+    tutorialStep1: 'Click the top disk to lift it',
+    tutorialStep2: 'Valid target pegs will be highlighted',
+    tutorialStep3: 'Click a highlighted peg to place the disk',
+    tutorialStep4: 'Goal: Move all disks to the rightmost peg',
+    tutorialStart: 'Start Game',
+    tutorialSkip: 'Skip',
+    rulesTitle: 'Game Rules',
+    rulesContent: [
+      'Move only one disk at a time',
+      'Only move the top disk of a peg',
+      'Never place a larger disk on a smaller one',
+      'Goal: Move all disks to the rightmost peg'
+    ],
+    close: 'Close'
   }
 }
 
@@ -70,7 +100,7 @@ export function toggleLanguage(): 'zh' | 'en' {
   return currentLang
 }
 
-export function t(key: keyof I18n): string {
+export function t(key: keyof I18n): string | string[] {
   return translations[currentLang][key]
 }
 

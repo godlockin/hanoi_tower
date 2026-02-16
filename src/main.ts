@@ -67,6 +67,30 @@ function setupEventListeners(): void {
     renderer.setUndoEnabled(currentState.moveCount > 0)
   })
 
+  // Help button
+  app.querySelector('.help-btn')?.addEventListener('click', () => {
+    renderer.showRules()
+  })
+
+  // Rules modal close
+  app.querySelector('.rules-modal')?.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    if (target.classList.contains('modal-backdrop') || target.classList.contains('modal-close')) {
+      renderer.hideRules()
+    }
+  })
+
+  // Tutorial navigation - track step locally
+  let currentTutorialStep = 0
+  app.querySelector('.tutorial-next')?.addEventListener('click', () => {
+    currentTutorialStep++
+    renderer.setTutorialStep(currentTutorialStep)
+  })
+
+  app.querySelector('.tutorial-skip')?.addEventListener('click', () => {
+    renderer.closeTutorial()
+  })
+
   // Disk click (lift) and peg click (place)
   app.querySelectorAll('.peg-container').forEach((peg, pegIndex) => {
     peg.addEventListener('click', (e) => {

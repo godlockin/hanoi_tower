@@ -14,7 +14,8 @@
       "Bash(lsof:*)",
       "Bash(curl:*)",
       "Bash(kill:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(npx tsx:*)"
     ]
   }
 }

@@ -14,6 +14,7 @@ export interface GameState {
   isPlaying: boolean
   isCompleted: boolean
   liftedDisk: { pegIndex: number; diskSize: number } | null
+  validTargets: number[] // Pegs where the lifted disk can be placed
 }
 
 export interface BestRecord {
@@ -49,4 +50,14 @@ export interface I18n {
   movesSuffix: string
   secondsSuffix: string
   cancel: string
+  tutorialTitle: string
+  tutorialStep1: string
+  tutorialStep2: string
+  tutorialStep3: string
+  tutorialStep4: string
+  tutorialStart: string
+  tutorialSkip: string
+  rulesTitle: string
+  rulesContent: string[]
+  close: string
 }
