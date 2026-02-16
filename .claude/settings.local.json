@@ -15,7 +15,10 @@
       "Bash(curl:*)",
       "Bash(kill:*)",
       "Bash(pkill:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "WebFetch(domain:b674466f.hanoi-tower.pages.dev)",
+      "Bash(git clone:*)",
+      "Bash(find:*)"
     ]
   }
 }

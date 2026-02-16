@@ -4,13 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a pure frontend Hanoi Tower (汉诺塔) game designed for deployment on Cloudflare Pages.
+A pure frontend Hanoi Tower (汉诺塔) game designed for Cloudflare Pages deployment.
 
-### Requirements (from sys_init/目标设定.md)
+**Live URL**: https://b674466f.hanoi-tower.pages.dev
 
-1. **Adjustable difficulty** - Players can select different difficulty levels
-2. **Cloudflare deployment** - Must be deployable to Cloudflare Pages
-3. **Timer feature** - Game includes a timing mechanism
+### Core Features
+- 4 difficulty levels: Easy (3 disks), Medium (5), Hard (7), Master (9)
+- Click-to-lift, click-to-place interaction model
+- Interactive tutorial for first-time users
+- Valid target highlighting (green pulse animation)
+- Undo, Hint, Reset controls
+- Bilingual support (Chinese/English)
+- LocalStorage persistence for best records
 
 ## Development Commands
 
@@ -24,7 +29,7 @@ npm run dev
 # Build for production
 npm run build
 
-# Preview production build locally
+# Preview production build
 npm run preview
 
 # Deploy to Cloudflare Pages
@@ -34,62 +39,126 @@ npm run deploy
 ## Project Structure
 
 ```
-/
-├── public/           # Static assets (favicon, images)
-├── src/
-│   ├── main.ts       # Entry point, event handlers
-│   ├── game.ts       # Hanoi Tower game logic and state
-│   ├── renderer.ts   # UI rendering and animations
-│   ├── types.ts      # TypeScript type definitions
-│   ├── i18n.ts       # Internationalization (zh/en)
-│   ├── storage.ts    # LocalStorage for best records
-│   └── styles.css    # Game styling
-├── index.html        # Main HTML file with loading animation
-├── package.json      # Dependencies and scripts
-├── tsconfig.json     # TypeScript configuration
-├── vite.config.ts    # Vite build configuration
-└── wrangler.toml     # Cloudflare Pages configuration
+src/
+├── main.ts       # Entry point, event handlers, game loop
+├── game.ts       # HanoiGame class - state management and rules
+├── renderer.ts   # Renderer class - DOM manipulation and UI
+├── types.ts      # TypeScript interfaces and types
+├── i18n.ts       # Internationalization (zh/en)
+├── storage.ts    # LocalStorage for best records
+└── styles.css    # Complete UI styling
+
+public/
+└── hanoi.svg     # Favicon
+
+index.html        # Main HTML with loading animation
+package.json      # Dependencies: vite, typescript, wrangler
+tsconfig.json     # Strict TypeScript config
+vite.config.ts    # Vite build configuration
+wrangler.toml     # Cloudflare Pages configuration
 ```
 
-## Game Mechanics
+## Architecture
 
-### Rules
-- Move all disks from the leftmost peg to the rightmost peg
-- Only one disk can be moved at a time
-- A larger disk cannot be placed on top of a smaller disk
+### State Flow
+```
+User Action → main.ts → game.ts (update state) → renderer.ts (re-render UI)
+                           ↓
+                    LocalStorage (persist records)
+```
 
-### Difficulty Levels
-| Level  | Disks | Optimal Moves |
-|--------|-------|---------------|
-| Easy   | 3     | 7             |
-| Medium | 5     | 31            |
-| Hard   | 7     | 127           |
-| Master | 9     | 511           |
+### Key Classes
 
-### Controls
-- **Click source peg** → Select top disk
-- **Click target peg** → Move disk (or flash red if invalid)
-- **Undo** → Reverse last move (unlimited)
-- **Hint** → Highlight recommended target peg
-- **Reset** → Restart current difficulty
+**HanoiGame** (`game.ts`)
+- Manages game state (pegs, disks, moves, timer)
+- Validates moves according to Hanoi Tower rules
+- Calculates valid target pegs for visual feedback
+- Maintains move history for undo functionality
+- Pre-calculates optimal solution for hints
 
-### Data Persistence
-Best records (time, moves, completion count, timestamp) are stored per difficulty in localStorage.
+**Renderer** (`renderer.ts`)
+- Creates and updates DOM elements
+- Handles tutorial overlay and modals
+- Calculates disk dimensions based on difficulty
+- Manages visual states (lifted, valid-target, etc.)
 
-## Architecture Notes
+### State Interface
+```typescript
+interface GameState {
+  pegs: number[][]              // 3 pegs, each with disk sizes
+  difficulty: Difficulty        // easy | medium | hard | master
+  diskCount: number
+  moveCount: number
+  elapsedTime: number           // seconds
+  isPlaying: boolean
+  isCompleted: boolean
+  liftedDisk: { pegIndex: number; diskSize: number } | null
+  validTargets: number[]        // Pegs where disk can be placed
+}
+```
 
-### Game Loop
-1. `HanoiGame` manages state and rules
-2. `Renderer` handles DOM updates and animations
-3. `main.ts` wires events between them
+## Interaction Model
 
-### Key Features
-- **Animations**: Jump-style disk movement, red flash for invalid moves, fireworks on victory
-- **i18n**: Toggle between Chinese (default) and English
-- **Responsive**: Adapts to mobile/desktop screens
-- **Optimal solution**: Pre-calculated for hint system using recursive algorithm
+1. **Lift**: Click top disk of a peg → disk floats up with glow effect
+2. **Visual Feedback**: Valid target pegs pulse green, invalid ones dim
+3. **Place**: Click target peg → disk moves, timer starts on first move
+4. **Cancel**: Click same peg to drop disk back
 
-### Type Safety
-- All state changes flow through `HanoiGame`
-- `Renderer` is pure view layer
-- Strict TypeScript configuration enabled
+## Known Issues (Post-Expert Review)
+
+### Performance
+- [ ] Full DOM rebuild on every state change (should use incremental updates)
+- [ ] Timer interval not cleaned up on page unload
+
+### UX
+- [ ] Two-stage click interaction less intuitive than drag-and-drop
+- [ ] Invalid moves have weak feedback (just cancels lift)
+- [ ] Difficulty switch has no confirmation (can lose progress)
+
+### Design
+- [ ] Disk colors lack contrast in higher difficulties
+- [ ] Color system needs design tokens overhaul
+- [ ] Mobile click targets too small
+
+### Code Quality
+- [ ] Renderer class has too many responsibilities
+- [ ] Type assertions needed for i18n return values
+- [ ] Magic numbers in disk sizing calculations
+
+## Future Improvements
+
+### P0 - Critical
+- Drag-and-drop interaction
+- Star rating system (3 stars for optimal moves)
+- Progressive difficulty (add 4, 6, 8 disk levels)
+
+### P1 - Features
+- Sound effects
+- Achievement system
+- Daily challenges
+- Global leaderboard
+
+### P2 - Polish
+- Theme unlocks
+- Better mobile touch targets
+- Haptic feedback
+- Share results
+
+## Tech Stack Notes
+
+- **Vite**: Fast dev server, optimized builds
+- **TypeScript**: Strict mode enabled
+- **No frameworks**: Vanilla TS for minimal bundle size
+- **Cloudflare Pages**: Edge deployment, automatic HTTPS
+
+## Deployment
+
+Current branch `miao` auto-deploys to:
+https://b674466f.hanoi-tower.pages.dev
+
+Wrangler config in `wrangler.toml`:
+```toml
+name = "hanoi-tower"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "./dist"
+```
