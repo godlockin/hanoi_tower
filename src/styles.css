@@ -313,16 +313,6 @@ body {
   border-radius: 1rem;
 }
 
-.peg-container.selected {
-  background: rgba(59, 130, 246, 0.1);
-  border-radius: 1rem;
-}
-
-.peg-container.selected .peg-rod {
-  background: var(--accent-primary);
-  box-shadow: 0 0 20px var(--accent-primary);
-}
-
 .peg-container.hint {
   background: rgba(34, 197, 94, 0.1);
   animation: hint-pulse 1s ease-in-out infinite;
@@ -331,15 +321,6 @@ body {
 @keyframes hint-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
   50% { box-shadow: 0 0 20px 5px rgba(34, 197, 94, 0.2); }
-}
-
-.peg-container.invalid-flash {
-  animation: flash-red 0.3s ease-in-out;
-}
-
-@keyframes flash-red {
-  0%, 100% { background: transparent; }
-  50% { background: rgba(239, 68, 68, 0.3); }
 }
 
 .peg-rod {
@@ -383,6 +364,39 @@ body {
   box-shadow: 0 2px 4px var(--disk-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transition: all 0.2s ease-out;
   animation: disk-appear 0.3s ease-out;
+  cursor: pointer;
+}
+
+.disk:hover {
+  filter: brightness(1.15);
+  transform: translateX(-50%) scale(1.02);
+}
+
+/* Lifted disk - floating above the peg */
+.disk.lifted {
+  animation: disk-lift 0.2s ease-out;
+  box-shadow: 0 8px 20px var(--disk-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  filter: brightness(1.2);
+}
+
+@keyframes disk-lift {
+  0% {
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+/* Source peg highlight when lifting */
+.peg-container.lifting-from {
+  background: rgba(59, 130, 246, 0.15);
+  border-radius: 1rem;
+}
+
+.peg-container.lifting-from .peg-rod {
+  background: var(--accent-primary);
+  box-shadow: 0 0 15px var(--accent-primary);
 }
 
 @keyframes disk-appear {
@@ -394,10 +408,6 @@ body {
     opacity: 1;
     transform: translateX(-50%) scale(1) translateY(0);
   }
-}
-
-.disk:hover {
-  filter: brightness(1.1);
 }
 
 /* Bottom Controls */

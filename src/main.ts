@@ -67,24 +67,42 @@ function setupEventListeners(): void {
     renderer.setUndoEnabled(currentState.moveCount > 0)
   })
 
-  // Peg click
-  app.querySelectorAll('.peg-container').forEach((peg, index) => {
-    peg.addEventListener('click', () => {
-      const result = game.selectPeg(index)
+  // Disk click (lift) and peg click (place)
+  app.querySelectorAll('.peg-container').forEach((peg, pegIndex) => {
+    peg.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement
+      const state = game.getState()
 
-      if (result === 'invalid') {
-        renderer.showInvalidMove(index)
-      } else if (result === 'completed') {
-        const state = game.getState()
-        const { isNewBestTime, isNewBestMoves } = saveRecord(
-          state.difficulty,
-          state.elapsedTime,
-          state.moveCount
-        )
-        renderer.showVictory(state, isNewBestTime || isNewBestMoves)
+      // Check if clicking on a disk (to lift it)
+      if (target.classList.contains('disk') && !state.liftedDisk) {
+        const diskPegIndex = parseInt(target.dataset.peg || '-1', 10)
+
+        // Only allow lifting the top disk of the peg
+        if (diskPegIndex === pegIndex) {
+          game.liftDisk(pegIndex)
+        }
+        return
       }
 
-      renderer.setUndoEnabled(game.getState().moveCount > 0)
+      // If we have a lifted disk, try to place it
+      if (state.liftedDisk) {
+        const result = game.placeDisk(pegIndex)
+
+        if (result === 'completed') {
+          const newState = game.getState()
+          const { isNewBestTime, isNewBestMoves } = saveRecord(
+            newState.difficulty,
+            newState.elapsedTime,
+            newState.moveCount
+          )
+          renderer.showVictory(newState, isNewBestTime || isNewBestMoves)
+        }
+
+        renderer.setUndoEnabled(game.getState().moveCount > 0)
+        return
+      }
+
+      // If no lifted disk and clicking on empty area of peg, do nothing
     })
   })
 

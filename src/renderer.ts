@@ -23,6 +23,7 @@ export class Renderer {
   private statsEl: HTMLElement | null = null
   private bestRecordEl: HTMLElement | null = null
   private hintPeg: number | null = null
+  private liftedDiskEl: HTMLElement | null = null
 
   constructor(container: HTMLElement) {
     this.container = container
@@ -33,6 +34,7 @@ export class Renderer {
       this.createBaseStructure()
     }
     this.updatePegs(gameState)
+    this.updateLiftedDisk(gameState)
     this.updateStats(gameState)
     this.updateBestRecord(gameState.difficulty)
   }
@@ -130,11 +132,10 @@ export class Renderer {
   }
 
   private updatePegs(state: GameState): void {
-    const { pegs, selectedPeg, diskCount } = state
+    const { pegs, liftedDisk, diskCount } = state
 
     this.pegs.forEach((pegEl, pegIndex) => {
-      // Update selected state
-      pegEl.classList.toggle('selected', selectedPeg === pegIndex)
+      // Update hint state
       pegEl.classList.toggle('hint', this.hintPeg === pegIndex)
 
       const diskStack = pegEl.querySelector('.disk-stack') as HTMLElement
@@ -144,17 +145,15 @@ export class Renderer {
       const maxDiskWidth = Math.min(80, 280 / diskCount)
       const minDiskWidth = Math.max(20, maxDiskWidth * 0.4)
       const widthStep = (maxDiskWidth - minDiskWidth) / (diskCount - 1 || 1)
+      const diskHeight = Math.max(16, 120 / diskCount)
 
       pegs[pegIndex].forEach((diskSize, diskIndex) => {
-        const disk = document.createElement('div')
-        disk.className = 'disk'
-        disk.dataset.size = String(diskSize)
-        disk.style.backgroundColor = DISK_COLORS[(diskSize - 1) % DISK_COLORS.length]
-        disk.style.width = `${minDiskWidth + (diskSize - 1) * widthStep}px`
-        disk.style.height = `${Math.max(16, 120 / diskCount)}px`
-        disk.style.bottom = `${diskIndex * (parseInt(disk.style.height) + 2)}px`
-        disk.style.zIndex = String(diskSize)
+        // Skip the lifted disk - it will be rendered separately
+        if (liftedDisk && liftedDisk.pegIndex === pegIndex && diskIndex === pegs[pegIndex].length - 1) {
+          return
+        }
 
+        const disk = this.createDiskElement(diskSize, diskIndex, minDiskWidth, widthStep, diskHeight, pegIndex)
         diskStack.appendChild(disk)
       })
     })
@@ -164,6 +163,67 @@ export class Renderer {
       const btnEl = btn as HTMLElement
       btnEl.classList.toggle('active', btnEl.dataset.difficulty === state.difficulty)
     })
+  }
+
+  private createDiskElement(
+    diskSize: number,
+    diskIndex: number,
+    minDiskWidth: number,
+    widthStep: number,
+    diskHeight: number,
+    pegIndex: number
+  ): HTMLElement {
+    const disk = document.createElement('div')
+    disk.className = 'disk'
+    disk.dataset.size = String(diskSize)
+    disk.dataset.peg = String(pegIndex)
+    disk.style.backgroundColor = DISK_COLORS[(diskSize - 1) % DISK_COLORS.length]
+    disk.style.width = `${minDiskWidth + (diskSize - 1) * widthStep}px`
+    disk.style.height = `${diskHeight}px`
+    disk.style.bottom = `${diskIndex * (diskHeight + 2)}px`
+    disk.style.zIndex = String(diskSize)
+
+    return disk
+  }
+
+  private updateLiftedDisk(state: GameState): void {
+    // Remove old lifted disk element
+    if (this.liftedDiskEl) {
+      this.liftedDiskEl.remove()
+      this.liftedDiskEl = null
+    }
+
+    if (!state.liftedDisk) return
+
+    const { pegIndex, diskSize } = state.liftedDisk
+    const pegEl = this.pegs[pegIndex]
+    if (!pegEl) return
+
+    // Calculate dimensions same as regular disks
+    const maxDiskWidth = Math.min(80, 280 / state.diskCount)
+    const minDiskWidth = Math.max(20, maxDiskWidth * 0.4)
+    const widthStep = (maxDiskWidth - minDiskWidth) / (state.diskCount - 1 || 1)
+    const diskHeight = Math.max(16, 120 / state.diskCount)
+
+    // Create lifted disk element
+    const liftedDisk = document.createElement('div')
+    liftedDisk.className = 'disk lifted'
+    liftedDisk.dataset.size = String(diskSize)
+    liftedDisk.style.backgroundColor = DISK_COLORS[(diskSize - 1) % DISK_COLORS.length]
+    liftedDisk.style.width = `${minDiskWidth + (diskSize - 1) * widthStep}px`
+    liftedDisk.style.height = `${diskHeight}px`
+    liftedDisk.style.zIndex = '100'
+
+    // Position it above the peg
+    const diskStack = pegEl.querySelector('.disk-stack') as HTMLElement
+    const stackHeight = state.pegs[pegIndex].length * (diskHeight + 2)
+    liftedDisk.style.bottom = `${stackHeight + 20}px`
+
+    diskStack.appendChild(liftedDisk)
+    this.liftedDiskEl = liftedDisk
+
+    // Highlight the source peg
+    pegEl.classList.add('lifting-from')
   }
 
   private updateStats(state: GameState): void {
@@ -202,22 +262,12 @@ export class Renderer {
     `
   }
 
-  showInvalidMove(pegIndex: number): void {
-    const peg = this.pegs[pegIndex]
-    if (!peg) return
-
-    peg.classList.add('invalid-flash')
-    setTimeout(() => {
-      peg.classList.remove('invalid-flash')
-    }, 300)
-  }
-
   showHint(from: number, to: number): void {
     // Highlight target peg
     this.hintPeg = to
     this.render({
       ...this.getCurrentStateFromDOM(),
-      selectedPeg: from
+      liftedDisk: { pegIndex: from, diskSize: 1 }
     } as GameState)
 
     // Clear hint after 1.5 seconds
@@ -225,7 +275,7 @@ export class Renderer {
       this.hintPeg = null
       this.render({
         ...this.getCurrentStateFromDOM(),
-        selectedPeg: null
+        liftedDisk: null
       } as GameState)
     }, 1500)
   }
@@ -294,7 +344,7 @@ export class Renderer {
       elapsedTime: 0,
       isPlaying: false,
       isCompleted: false,
-      selectedPeg: null
+      liftedDisk: null
     }
   }
 }

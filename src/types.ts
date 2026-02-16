@@ -13,7 +13,7 @@ export interface GameState {
   elapsedTime: number // in seconds
   isPlaying: boolean
   isCompleted: boolean
-  selectedPeg: number | null
+  liftedDisk: { pegIndex: number; diskSize: number } | null
 }
 
 export interface BestRecord {
