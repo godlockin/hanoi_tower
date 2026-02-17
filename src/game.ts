@@ -2,19 +2,33 @@ import type { GameState, Move, Difficulty } from './types'
 
 const DISK_COUNTS: Record<Difficulty, number> = {
   easy: 3,
-  medium: 5,
-  hard: 7,
-  master: 9
+  medium: 4,
+  hard: 5,
+  harder: 6,
+  expert: 7,
+  master: 8,
+  grandmaster: 9
 }
 
 export class HanoiGame {
   private state: GameState
   private moveHistory: Move[] = []
+  private redoHistory: Move[] = []
   private optimalSolution: Move[] = []
   private onStateChange?: (state: GameState) => void
 
-  constructor(difficulty: Difficulty = 'easy') {
-    this.state = this.initializeState(difficulty)
+  constructor(difficulty: Difficulty = 'easy', restoredState?: Partial<GameState>) {
+    if (restoredState) {
+      this.state = {
+        ...this.initializeState(difficulty),
+        ...restoredState,
+        liftedDisk: null,
+        validTargets: [],
+        lastAction: null
+      }
+    } else {
+      this.state = this.initializeState(difficulty)
+    }
     this.calculateOptimalSolution()
   }
 
@@ -36,7 +50,8 @@ export class HanoiGame {
       isPlaying: false,
       isCompleted: false,
       liftedDisk: null,
-      validTargets: []
+      validTargets: [],
+      lastAction: null
     }
   }
 
@@ -60,13 +75,11 @@ export class HanoiGame {
 
     for (let i = 0; i < 3; i++) {
       if (i === fromPeg) {
-        // Same peg is always a valid target (to cancel)
         validTargets.push(i)
         continue
       }
 
       const topDisk = this.state.pegs[i][this.state.pegs[i].length - 1]
-      // Can place on empty peg or on larger disk
       if (topDisk === undefined || diskSize < topDisk) {
         validTargets.push(i)
       }
@@ -87,73 +100,85 @@ export class HanoiGame {
     return Math.pow(2, this.state.diskCount) - 1
   }
 
-  /** Click on a disk to lift it (must be top disk) */
-  liftDisk(pegIndex: number): boolean {
+  getStarRating(): number {
+    const optimal = this.getOptimalMoves()
+    const current = this.state.moveCount
+    const ratio = current / optimal
+
+    if (ratio <= 1.1) return 3
+    if (ratio <= 1.5) return 2
+    return 1
+  }
+
+  liftDisk(pegIndex: number): { success: boolean; error?: string } {
     const { pegs, isCompleted, liftedDisk } = this.state
 
-    if (isCompleted) return false
-    if (liftedDisk) return false // Already lifting a disk
-    if (pegs[pegIndex].length === 0) return false // No disk to lift
+    if (isCompleted) return { success: false, error: 'game_completed' }
+    if (liftedDisk) return { success: false, error: 'already_lifting' }
+    if (pegs[pegIndex].length === 0) return { success: false, error: 'empty_peg' }
 
     const diskSize = pegs[pegIndex][pegs[pegIndex].length - 1]
 
     this.state.liftedDisk = { pegIndex, diskSize }
     this.state.validTargets = this.calculateValidTargets()
+    this.state.lastAction = 'lift'
     this.notifyStateChange()
-    return true
+    return { success: true }
   }
 
-  /** Click on a peg to place the lifted disk */
-  placeDisk(targetPegIndex: number): 'placed' | 'invalid' | 'completed' | 'cancelled' {
+  placeDisk(targetPegIndex: number): { result: 'placed' | 'invalid' | 'completed' | 'cancelled'; error?: string } {
     const { pegs, liftedDisk } = this.state
 
-    if (!liftedDisk) return 'invalid'
+    if (!liftedDisk) return { result: 'invalid', error: 'no_disk_lifted' }
 
     const { pegIndex: fromPeg, diskSize } = liftedDisk
 
-    // If clicking the same peg, cancel the lift
     if (fromPeg === targetPegIndex) {
       this.state.liftedDisk = null
       this.state.validTargets = []
+      this.state.lastAction = 'cancel'
       this.notifyStateChange()
-      return 'cancelled'
+      return { result: 'cancelled' }
     }
 
     const topDiskTarget = pegs[targetPegIndex][pegs[targetPegIndex].length - 1]
 
-    // Check if move is valid (can place on empty peg or on larger disk)
     if (topDiskTarget === undefined || diskSize < topDiskTarget) {
-      // Execute move
       pegs[fromPeg].pop()
       pegs[targetPegIndex].push(diskSize)
 
       this.moveHistory.push({ from: fromPeg, to: targetPegIndex })
       this.state.moveCount++
+
+      // Clear redo history on new move
+      this.redoHistory = []
       this.state.liftedDisk = null
       this.state.validTargets = []
+      this.state.lastAction = 'place'
 
-      // Start timer on first move
       if (!this.state.isPlaying && this.state.moveCount === 1) {
         this.state.isPlaying = true
       }
 
-      // Check win condition (all disks on last peg)
       if (pegs[2].length === this.state.diskCount) {
         this.state.isCompleted = true
         this.state.isPlaying = false
+        this.state.lastAction = 'complete'
         this.notifyStateChange()
-        return 'completed'
+        return { result: 'completed' }
       }
 
       this.notifyStateChange()
-      return 'placed'
+      return { result: 'placed' }
     }
 
-    // Invalid move - target peg has smaller disk, just cancel the lift
-    this.state.liftedDisk = null
-    this.state.validTargets = []
+    this.state.lastAction = 'invalid'
     this.notifyStateChange()
-    return 'invalid'
+    return { result: 'invalid', error: 'invalid_move' }
+  }
+
+  clearLastAction(): void {
+    this.state.lastAction = null
   }
 
   undo(): boolean {
@@ -164,10 +189,14 @@ export class HanoiGame {
     const disk = this.state.pegs[to].pop()!
     this.state.pegs[from].push(disk)
     this.state.moveCount--
+
+    // Save to redo history
+    this.redoHistory.push(lastMove)
+
     this.state.liftedDisk = null
     this.state.validTargets = []
+    this.state.lastAction = 'undo'
 
-    // If undoing the last move, stop the game
     if (this.state.moveCount === 0) {
       this.state.isPlaying = false
       this.state.elapsedTime = 0
@@ -177,10 +206,60 @@ export class HanoiGame {
     return true
   }
 
+  redo(): boolean {
+    if (this.redoHistory.length === 0) return false
+
+    const nextMove = this.redoHistory.pop()!
+    const { from, to } = nextMove
+    const disk = this.state.pegs[from].pop()!
+    this.state.pegs[to].push(disk)
+    this.state.moveCount++
+
+    // Save back to move history
+    this.moveHistory.push(nextMove)
+
+    this.state.liftedDisk = null
+    this.state.validTargets = []
+    this.state.lastAction = 'place'
+
+    if (!this.state.isPlaying && this.state.moveCount === 1) {
+      this.state.isPlaying = true
+    }
+
+    if (this.state.pegs[2].length === this.state.diskCount) {
+      this.state.isCompleted = true
+      this.state.isPlaying = false
+      this.state.lastAction = 'complete'
+    }
+
+    this.notifyStateChange()
+    return true
+  }
+
+  canRedo(): boolean {
+    return this.redoHistory.length > 0
+  }
+
+  // Get current state for persistence
+  getPersistableState(): {
+    difficulty: Difficulty
+    pegs: number[][]
+    moveCount: number
+    elapsedTime: number
+    moveHistory: Move[]
+  } {
+    return {
+      difficulty: this.state.difficulty,
+      pegs: this.state.pegs.map(peg => [...peg]), // Deep copy
+      moveCount: this.state.moveCount,
+      elapsedTime: this.state.elapsedTime,
+      moveHistory: [...this.moveHistory]
+    }
+  }
+
   getHint(): { from: number; to: number } | null {
     if (this.state.isCompleted) return null
 
-    // Find the next optimal move based on current state
     const currentMoves = this.moveHistory.length
     if (currentMoves < this.optimalSolution.length) {
       return this.optimalSolution[currentMoves]
@@ -188,9 +267,14 @@ export class HanoiGame {
     return null
   }
 
+  setMoveHistory(history: Move[]): void {
+    this.moveHistory = history
+  }
+
   reset(): void {
     this.state = this.initializeState(this.state.difficulty)
     this.moveHistory = []
+    this.redoHistory = []
     this.calculateOptimalSolution()
     this.notifyStateChange()
   }
@@ -198,6 +282,7 @@ export class HanoiGame {
   changeDifficulty(difficulty: Difficulty): void {
     this.state = this.initializeState(difficulty)
     this.moveHistory = []
+    this.redoHistory = []
     this.calculateOptimalSolution()
     this.notifyStateChange()
   }
