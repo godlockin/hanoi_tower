@@ -220,3 +220,34 @@ export function loadSessionState(): SessionState | null {
 export function clearSessionState(): void {
   sessionStorage.removeItem(SESSION_KEY)
 }
+
+// Debug function to diagnose storage issues
+export function debugStorage(): void {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY)
+    console.log('=== Hanoi Tower Storage Debug ===')
+    console.log('Storage Key:', STORAGE_KEY)
+    console.log('Raw Data:', data)
+
+    if (data) {
+      const records = JSON.parse(data)
+      console.log('Parsed Records:', records)
+
+      DIFFICULTY_ORDER.forEach((diff, index) => {
+        const record = records[diff]
+        const isUnlocked = index === 0 || (records[DIFFICULTY_ORDER[index - 1]]?.bestStars >= 2)
+        console.log(`${diff}:`, {
+          record: record || 'missing',
+          bestStars: record?.bestStars ?? 0,
+          isUnlocked,
+          prevDiffStars: index > 0 ? (records[DIFFICULTY_ORDER[index - 1]]?.bestStars ?? 0) : 'N/A'
+        })
+      })
+    } else {
+      console.log('No data found in LocalStorage')
+    }
+    console.log('================================')
+  } catch (e) {
+    console.error('Debug error:', e)
+  }
+}

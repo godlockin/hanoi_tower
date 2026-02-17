@@ -2,7 +2,7 @@ import './styles.css'
 import { HanoiGame } from './game'
 import { Renderer } from './renderer'
 import { toggleLanguage, t } from './i18n'
-import { saveRecord, isDifficultyUnlocked, saveSessionState, loadSessionState, clearSessionState, initTheme, setTheme, getTheme, type Theme } from './storage'
+import { saveRecord, isDifficultyUnlocked, saveSessionState, loadSessionState, clearSessionState, initTheme, setTheme, getTheme, debugStorage, type Theme } from './storage'
 import { audio } from './audio'
 import type { Difficulty } from './types'
 
@@ -614,3 +614,6 @@ window.addEventListener('beforeunload', () => {
 })
 
 document.addEventListener('DOMContentLoaded', init)
+
+// Expose debug function to window for troubleshooting
+;(window as unknown as Record<string, unknown>).debugHanoi = debugStorage
