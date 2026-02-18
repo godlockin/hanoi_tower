@@ -553,22 +553,41 @@ body {
   font-weight: 600;
 }
 
-/* ===== Keyboard Hint ===== */
-.keyboard-hint {
-  display: flex;
-  justify-content: center;
-  gap: 2rem;
-  margin-top: 0.5rem;
-  padding: 0.25rem 0;
-}
+/* ===== Keyboard Hint (Legacy removed, now integrated into pegs) ===== */
 
-.keyboard-hint span {
-  font-size: 0.75rem;
+.peg-key-label {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--text-muted);
   background: var(--bg-tertiary);
-  padding: 0.15rem 0.5rem;
+  padding: 0.2rem 0.6rem;
   border-radius: var(--radius-sm);
   font-family: monospace;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid transparent;
+}
+
+.peg-container:hover .peg-key-label,
+.peg-container:focus-within .peg-key-label {
+  color: var(--text-primary);
+  border-color: var(--accent-gold);
+  background: var(--bg-secondary);
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.peg-container.lifting-from .peg-key-label {
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+}
+
+.peg-container.valid-target .peg-key-label {
+  background: var(--accent-success);
+  color: white;
 }
 
 /* ===== Difficulty Bar ===== */

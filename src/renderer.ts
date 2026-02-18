@@ -148,6 +148,12 @@ export class Renderer {
       peg.appendChild(pegBase)
       peg.appendChild(diskStack)
 
+      // Create peg label
+      const pegLabel = document.createElement('div')
+      pegLabel.className = 'peg-key-label'
+      pegLabel.textContent = String(i + 1)
+      peg.appendChild(pegLabel)
+
       // Make peg a drop zone
       peg.addEventListener('dragover', (e) => {
         e.preventDefault()
@@ -173,12 +179,6 @@ export class Renderer {
       this.gameBoard.appendChild(peg)
       this.pegs.push(peg)
     }
-
-    // Keyboard hint
-    const keyboardHint = document.createElement('div')
-    keyboardHint.className = 'keyboard-hint'
-    keyboardHint.innerHTML = `<span>[1]</span><span>[2]</span><span>[3]</span>`
-    gameArea.appendChild(keyboardHint)
 
     // Status hint bar
     this.statusHintEl = document.createElement('div')
